@@ -28,12 +28,12 @@ describe("PodyPoint", function () {
       expect(await podyPoint.hashRates(3)).to.equal(ethers.parseEther("2"));
       expect(await podyPoint.hashRates(4)).to.equal(ethers.parseEther("2.5"));
       expect(await podyPoint.hashRates(5)).to.equal(ethers.parseEther("3"));
-
+  
       expect(await podyPoint.prices(1)).to.equal(0);
-      expect(await podyPoint.prices(2)).to.equal(ethers.parseEther("0.01"));
-      expect(await podyPoint.prices(3)).to.equal(ethers.parseEther("0.02"));
-      expect(await podyPoint.prices(4)).to.equal(ethers.parseEther("0.04"));
-      expect(await podyPoint.prices(5)).to.equal(ethers.parseEther("0.05"));
+      expect(await podyPoint.prices(2)).to.equal(ethers.parseEther("0.001"));
+      expect(await podyPoint.prices(3)).to.equal(ethers.parseEther("0.002"));
+      expect(await podyPoint.prices(4)).to.equal(ethers.parseEther("0.004"));
+      expect(await podyPoint.prices(5)).to.equal(ethers.parseEther("0.005"));
     });
   });
 
