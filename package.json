@@ -1,0 +1,12 @@
+{
+  "name": "hardhat-project",
+  "devDependencies": {
+    "@ethersproject/keccak256": "^5.7.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "hardhat": "^2.22.11"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
