@@ -19,7 +19,7 @@ module.exports = {
     opencampus: {
       url: `https://open-campus-codex-sepolia.drpc.org`,
       accounts: {
-        mnemonic: process.env.PASSPHRASE,
+        mnemonic: process.env.PASSPHRASE ?? "",
       },
     }
   }
