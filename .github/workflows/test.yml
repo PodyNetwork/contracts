@@ -33,7 +33,7 @@ jobs:
           ${{ runner.os }}-
           
     - name: Install dependencies
-      run: npm install
+      run: npm install --save-dev
       
     - name: Run Hardhat tests
       run: npx hardhat test
