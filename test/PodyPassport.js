@@ -1,6 +1,7 @@
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { log10 } = require("../utils/log10");
 
 describe("PodyPassport", function () {
   async function deployPodyPassportFixture() {
@@ -34,6 +35,11 @@ describe("PodyPassport", function () {
       expect(await podyPassport.prices(3)).to.equal(ethers.parseEther("0.002"));
       expect(await podyPassport.prices(4)).to.equal(ethers.parseEther("0.004"));
       expect(await podyPassport.prices(5)).to.equal(ethers.parseEther("0.005"));
+    });
+
+    it("Should set the correct multiSigWallet", async function () {
+      const { podyPassport, multiSigWallet } = await loadFixture(deployPodyPassportFixture);
+      expect(await podyPassport.multiSigWallet()).to.equal(multiSigWallet.address);
     });
   });
 
@@ -74,109 +80,303 @@ describe("PodyPassport", function () {
       expect(user.hashRate).to.equal(ethers.parseEther("2"));
       expect(user.level).to.equal(3);
     });
+
+    it("Should fail if user has reached maximum level", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      // Mint all levels
+      for (let i = 1; i <= 5; i++) {
+        const price = await podyPassport.prices(i);
+        await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: price });
+      }
+      
+      // Try to mint again
+      await expect(podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("1") }))
+        .to.be.revertedWith("You have reached the maximum level");
+    });
+
+    it("Should emit NFTMinted event", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(podyPassport.connect(owner).mint(otherAccount.address, "0x"))
+        .to.emit(podyPassport, "NFTMinted")
+        .withArgs(otherAccount.address, 1);
+    });
   });
 
 
-describe("Claiming Points", function () {
-  it("Should claim points correctly", async function () {
-    const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-    const nonce = ethers.hexlify(ethers.randomBytes(32)).toString(); // Generate a random nonce
-    const secondsOnCall = 3600;
-    const isHost = true;
-    const numberOfParticipants = 10;
+   describe("Claiming Points", function () {
+    it("Should claim points correctly", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = true;
+      const numberOfParticipants = 10;
+      const snapshottedHashRate = ethers.parseEther("1"); // Assuming Bronze level
 
-    await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.01") });
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
 
-    const messageHash = await podyPassport.generatePoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost
-    );
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
 
-    const signature = await owner.signMessage(ethers.getBytes(messageHash));
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
 
-    await podyPassport.connect(otherAccount).claimPoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost,
-      signature
-    );
+      await podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      );
 
-    const user = await podyPassport.users(otherAccount.address);
-    expect(user.points).to.be.above(0);
+      const user = await podyPassport.users(otherAccount.address);
+      expect(user.points).to.be.above(0);
+    });
+
+    it("Should fail with invalid nonce", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = true;
+      const numberOfParticipants = 10;
+      const snapshottedHashRate = ethers.parseEther("1");
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      );
+
+      // Try to claim with the same nonce again
+      await expect(podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      )).to.be.revertedWith("Invalid nonce");
+    });
+
+    it("Should fail with invalid admin signature", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = true;
+      const numberOfParticipants = 10;
+      const snapshottedHashRate = ethers.parseEther("1");
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await otherAccount.signMessage(ethers.getBytes(messageHash)); // Using otherAccount instead of owner
+
+      await expect(podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      )).to.be.revertedWith("Invalid admin signature");
+    });
+
+    it("Should calculate points correctly for host", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600
+      const isHost = true;
+      const numberOfParticipants = 10;
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      );
+
+      const user = await podyPassport.users(otherAccount.address);
+      const expectedPoints = (BigInt(secondsOnCall) * snapshottedHashRate) + (BigInt(secondsOnCall) * ethers.parseEther(Math.log10(numberOfParticipants).toString()));
+      expect(user.points).to.equal(expectedPoints);
+    });
+
+    it("Should calculate points correctly for non-host", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = false;
+      const numberOfParticipants = 10;
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      );
+
+      const user = await podyPassport.users(otherAccount.address);
+      const expectedPoints = BigInt(secondsOnCall) * snapshottedHashRate;
+      expect(user.points).to.equal(expectedPoints);
+    });
+
+    it("Should fail if hash rate is 0", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = false;
+      const numberOfParticipants = 10;
+      const snapshottedHashRate = ethers.parseEther("0");
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await expect(podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      )).to.be.revertedWith("Hash rate is 0");
+    });
+
+    it("Should fail if snapshotted hash rate is greater than user's hash rate", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = false;
+      const numberOfParticipants = 10;
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      const userHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
+      const snapshottedHashRate = userHashRate + BigInt(1);
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await expect(podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      )).to.be.revertedWith("Invalid hash rate");
+    });
+
+    it("Should emit PointsClaimed event", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const nonce = ethers.hexlify(ethers.randomBytes(32));
+      const secondsOnCall = 3600;
+      const isHost = false;
+      const numberOfParticipants = 10;
+
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
+
+      const messageHash = await podyPassport.generatePoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate
+      );
+      const signature = await owner.signMessage(ethers.getBytes(messageHash));
+
+      await expect(podyPassport.connect(otherAccount).claimPoints(
+        otherAccount.address,
+        secondsOnCall,
+        numberOfParticipants,
+        nonce,
+        isHost,
+        snapshottedHashRate,
+        signature
+      )).to.emit(podyPassport, "PointsClaimed").withArgs(otherAccount.address, BigInt(secondsOnCall) * snapshottedHashRate);
+    });
   });
-
-  it("Should fail with invalid nonce", async function () {
-    const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-    const nonce = "unique_nonce";
-    const secondsOnCall = 3600;
-    const isHost = true;
-    const numberOfParticipants = 10;
-
-    await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.01") });
-
-    const messageHash = await podyPassport.generatePoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost
-    );
-    const signature = await owner.signMessage(ethers.getBytes(messageHash));
-
-    await podyPassport.connect(otherAccount).claimPoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost,
-      signature
-    );
-
-    // Try to claim with the same nonce again
-    await expect(podyPassport.connect(otherAccount).claimPoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost,
-      signature
-    )).to.be.revertedWith("Invalid nonce");
-  });
-
-  it("Should fail with invalid admin signature", async function () {
-    const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-    const nonce = "unique_nonce";
-    const secondsOnCall = 3600;
-    const isHost = true;
-    const numberOfParticipants = 10;
-
-    await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.01") });
-
-    const messageHash = await podyPassport.generatePoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost
-    );
-    const signature = await otherAccount.signMessage(ethers.getBytes(messageHash)); // Using otherAccount instead of owner
-
-    await expect(podyPassport.connect(otherAccount).claimPoints(
-      otherAccount.address,
-      secondsOnCall,
-      numberOfParticipants,
-      nonce,
-      isHost,
-      signature
-    )).to.be.revertedWith("Invalid admin signature");
-  });
-});
-
+  
 
   describe("Withdrawals", function () {
 
@@ -242,6 +442,95 @@ describe("Claiming Points", function () {
       
       // Check that the balance hasn't changed
       expect(await mockERC20.balanceOf(podyPassportAddress)).to.equal(ethers.parseEther("1"));
+    });
+
+    it("Should fail to withdraw ERC20 tokens if token address is zero", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(
+        podyPassport.connect(owner).withdrawERC20(ethers.ZeroAddress, otherAccount.address, ethers.parseEther("1"))
+      ).to.be.revertedWith("Invalid token address");
+    });
+
+    it("Should fail to withdraw ERC20 tokens if recipient address is zero", async function () {
+      const { podyPassport, mockERC20, owner } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(
+        podyPassport.connect(owner).withdrawERC20(await mockERC20.getAddress(), ethers.ZeroAddress, ethers.parseEther("1"))
+      ).to.be.revertedWith("Invalid recipient address");
+    });
+
+    it("Should fail to withdraw ERC20 tokens if amount is zero", async function () {
+      const { podyPassport, mockERC20, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(
+        podyPassport.connect(owner).withdrawERC20(await mockERC20.getAddress(), otherAccount.address, 0)
+      ).to.be.revertedWith("Amount must be greater than zero");
+    });
+
+    it("Should emit FundsWithdrawn event on successful withdrawal", async function () {
+      const { podyPassport, mockERC20, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      const podyPassportAddress = await podyPassport.getAddress();
+      const mockERC20Address = await mockERC20.getAddress();
+      const otherAccountAddress = await otherAccount.getAddress();
+
+      // Mint some tokens to the PodyPassport contract
+      await mockERC20.mint(podyPassportAddress, ethers.parseEther("100"));
+      
+      // Withdraw tokens
+      const withdrawAmount = ethers.parseEther("50");
+      await expect(podyPassport.connect(owner).withdrawERC20(mockERC20Address, otherAccountAddress, withdrawAmount))
+        .to.emit(podyPassport, "FundsWithdrawn")
+        .withArgs(mockERC20Address, otherAccountAddress, withdrawAmount);
+    });
+  });
+
+  describe("Transfer restrictions", function () {
+    it("Should not allow safeTransferFrom", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await podyPassport.connect(owner).mint(owner.address, "0x", { value: ethers.parseEther("0.001") });
+      
+      await expect(
+        podyPassport.connect(owner).safeTransferFrom(owner.address, otherAccount.address, 1, 1, "0x")
+      ).to.be.revertedWith("Transfers are not allowed");
+    });
+
+    it("Should not allow safeBatchTransferFrom", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await podyPassport.connect(owner).mint(owner.address, "0x", { value: ethers.parseEther("0.001") });
+      
+      await expect(
+        podyPassport.connect(owner).safeBatchTransferFrom(owner.address, otherAccount.address, [1], [1], "0x")
+      ).to.be.revertedWith("Transfers are not allowed");
+    });
+  });
+
+  describe("MultiSig wallet management", function () {
+    it("Should allow owner to set new multiSig wallet", async function () {
+      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await podyPassport.connect(owner).setMultiSigWallet(otherAccount.address);
+      
+      expect(await podyPassport.multiSigWallet()).to.equal(otherAccount.address);
+    });
+
+    it("Should not allow non-owner to set new multiSig wallet", async function () {
+      const { podyPassport, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(
+        podyPassport.connect(otherAccount).setMultiSigWallet(otherAccount.address)
+      ).to.be.revertedWithCustomError(podyPassport, "OwnableUnauthorizedAccount");
+    });
+
+    it("Should not allow setting zero address as multiSig wallet", async function () {
+      const { podyPassport, owner } = await loadFixture(deployPodyPassportFixture);
+      
+      await expect(
+        podyPassport.connect(owner).setMultiSigWallet(ethers.ZeroAddress)
+      ).to.be.revertedWith("Invalid multisig wallet address");
     });
   });
 });
