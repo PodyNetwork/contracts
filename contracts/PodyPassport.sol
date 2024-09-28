@@ -55,7 +55,7 @@ contract PodyPassport is ERC1155, Ownable2Step {
         prices[DIAMOND] = 5000000000000000; 
     }
 
-    function mint(address account, bytes memory data) external payable onlyOwner {
+    function mint(address account, bytes memory data) external payable {
         User storage user = users[account];
         require(user.level < 5, "You have reached the maximum level");
         uint256 nextLevel = user.level + 1;
