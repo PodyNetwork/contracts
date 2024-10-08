@@ -73,43 +73,26 @@ contract PodyPassport is ERC1155, Ownable2Step {
 
     function claimPoints(
         address userAddress,
-        uint256 secondsOnCall,
-        uint256 numberOfParticipants,
         string memory nonce,
-        bool isHost,
-        uint256 snapshottedHashRate,
+        uint256 points,
         bytes memory signature
     ) external {
         require(!usedNonces[nonce], "Invalid nonce");
         User storage user = users[userAddress];
-        require(user.hashRate > 0 && snapshottedHashRate > 0, "Hash rate is 0");
-        require(snapshottedHashRate <= user.hashRate, "Invalid hash rate");
-        bytes32 messageHash = generatePoints(userAddress, secondsOnCall, numberOfParticipants, nonce, isHost, snapshottedHashRate);
+        bytes32 messageHash = generatePoints(userAddress, nonce, points);
         address signer = messageHash.toEthSignedMessageHash().recover(signature);
         require(signer == owner(), "Invalid admin signature");
-        uint256 points = (snapshottedHashRate * secondsOnCall);
-        if (isHost) {
-            require(numberOfParticipants > 0, "Number of participants must be greater than zero");
-            points += (((secondsOnCall) * Math.log10(numberOfParticipants)) * 1 ether);
-        }
-        user.points = user.points + points;
+        user.points += points;
         usedNonces[nonce] = true;
         emit PointsClaimed(userAddress, points);
     }
 
     function generatePoints(
         address userAddress,
-        uint256 secondsOnCall,
-        uint256 numberOfParticipants,
         string memory nonce,
-        bool isHost,
-        uint256 snapshottedHashRate
+        uint256 points
     ) public view returns (bytes32) {
-        if (isHost) {
-            return keccak256(abi.encodePacked(userAddress, secondsOnCall, numberOfParticipants, nonce, isHost, snapshottedHashRate, address(this), block.chainid));
-        } else {
-            return keccak256(abi.encodePacked(userAddress, secondsOnCall, nonce, snapshottedHashRate, address(this), block.chainid));
-        }
+        return keccak256(abi.encodePacked(userAddress, points, nonce, address(this), block.chainid));
     }
 
     function safeTransferFrom(

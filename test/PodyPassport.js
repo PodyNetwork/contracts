@@ -1,7 +1,6 @@
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { log10 } = require("../utils/log10");
 
 describe("PodyPassport", function () {
   async function deployPodyPassportFixture() {
@@ -13,7 +12,8 @@ describe("PodyPassport", function () {
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     const mockERC20 = await MockERC20.deploy("MockToken", "MTK");
 
-    return { podyPassport, mockERC20, owner, otherAccount, multiSigWallet };
+    const points = 100;
+    return { points, podyPassport, mockERC20, owner, otherAccount, multiSigWallet };
   }
 
   describe("Deployment", function () {
@@ -107,33 +107,23 @@ describe("PodyPassport", function () {
 
    describe("Claiming Points", function () {
     it("Should claim points correctly", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const { podyPassport, owner, otherAccount, points } = await loadFixture(deployPodyPassportFixture);
       const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = true;
-      const numberOfParticipants = 10;
-      const snapshottedHashRate = ethers.parseEther("1"); // Assuming Bronze level
 
       await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate
+        points,
       );
 
       const signature = await owner.signMessage(ethers.getBytes(messageHash));
 
       await podyPassport.connect(otherAccount).claimPoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate,
+        points,
         signature
       );
 
@@ -142,238 +132,54 @@ describe("PodyPassport", function () {
     });
 
     it("Should fail with invalid nonce", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const { podyPassport, owner, otherAccount, points } = await loadFixture(deployPodyPassportFixture);
       const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = true;
-      const numberOfParticipants = 10;
-      const snapshottedHashRate = ethers.parseEther("1");
 
       await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate
+        points,
       );
       const signature = await owner.signMessage(ethers.getBytes(messageHash));
 
       await podyPassport.connect(otherAccount).claimPoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate,
+        points,
         signature
       );
 
       // Try to claim with the same nonce again
       await expect(podyPassport.connect(otherAccount).claimPoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate,
+        points,
         signature
       )).to.be.revertedWith("Invalid nonce");
     });
 
-    it("Should fail with invalid admin signature", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = true;
-      const numberOfParticipants = 10;
-      const snapshottedHashRate = ethers.parseEther("1");
-
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
-
-      const messageHash = await podyPassport.generatePoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate
-      );
-      const signature = await otherAccount.signMessage(ethers.getBytes(messageHash)); // Using otherAccount instead of owner
-
-      await expect(podyPassport.connect(otherAccount).claimPoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate,
-        signature
-      )).to.be.revertedWith("Invalid admin signature");
-    });
-
-    it("Should calculate points correctly for host", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600
-      const isHost = true;
-      const numberOfParticipants = 10;
-
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
-      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
-
-      const messageHash = await podyPassport.generatePoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate
-      );
-      const signature = await owner.signMessage(ethers.getBytes(messageHash));
-
-      await podyPassport.connect(otherAccount).claimPoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate,
-        signature
-      );
-
-      const user = await podyPassport.users(otherAccount.address);
-      const expectedPoints = (BigInt(secondsOnCall) * snapshottedHashRate) + (BigInt(secondsOnCall) * ethers.parseEther(Math.log10(numberOfParticipants).toString()));
-      expect(user.points).to.equal(expectedPoints);
-    });
-
-    it("Should calculate points correctly for non-host", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = false;
-      const numberOfParticipants = 10;
-
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
-      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
-
-      const messageHash = await podyPassport.generatePoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate
-      );
-      const signature = await owner.signMessage(ethers.getBytes(messageHash));
-
-      await podyPassport.connect(otherAccount).claimPoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate,
-        signature
-      );
-
-      const user = await podyPassport.users(otherAccount.address);
-      const expectedPoints = BigInt(secondsOnCall) * snapshottedHashRate;
-      expect(user.points).to.equal(expectedPoints);
-    });
-
-    it("Should fail if hash rate is 0", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = false;
-      const numberOfParticipants = 10;
-      const snapshottedHashRate = ethers.parseEther("0");
-
-      const messageHash = await podyPassport.generatePoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate
-      );
-      const signature = await owner.signMessage(ethers.getBytes(messageHash));
-
-      await expect(podyPassport.connect(otherAccount).claimPoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate,
-        signature
-      )).to.be.revertedWith("Hash rate is 0");
-    });
-
-    it("Should fail if snapshotted hash rate is greater than user's hash rate", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      const nonce = ethers.hexlify(ethers.randomBytes(32));
-      const secondsOnCall = 3600;
-      const isHost = false;
-      const numberOfParticipants = 10;
-
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
-      const userHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
-      const snapshottedHashRate = userHashRate + BigInt(1);
-
-      const messageHash = await podyPassport.generatePoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate
-      );
-      const signature = await owner.signMessage(ethers.getBytes(messageHash));
-
-      await expect(podyPassport.connect(otherAccount).claimPoints(
-        otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
-        nonce,
-        isHost,
-        snapshottedHashRate,
-        signature
-      )).to.be.revertedWith("Invalid hash rate");
-    });
-
     it("Should emit PointsClaimed event", async function () {
-      const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
+      const { podyPassport, owner, otherAccount, points } = await loadFixture(deployPodyPassportFixture);
       const nonce = ethers.hexlify(ethers.randomBytes(32));
       const secondsOnCall = 3600;
-      const isHost = false;
-      const numberOfParticipants = 10;
 
       await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
-      const snapshottedHashRate = (await podyPassport.users(otherAccount.address)).hashRate;
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate
+        points,
       );
       const signature = await owner.signMessage(ethers.getBytes(messageHash));
 
       await expect(podyPassport.connect(otherAccount).claimPoints(
         otherAccount.address,
-        secondsOnCall,
-        numberOfParticipants,
         nonce,
-        isHost,
-        snapshottedHashRate,
+        points,
         signature
-      )).to.emit(podyPassport, "PointsClaimed").withArgs(otherAccount.address, BigInt(secondsOnCall) * snapshottedHashRate);
+      )).to.emit(podyPassport, "PointsClaimed").withArgs(otherAccount.address, points);
     });
   });
   
@@ -385,7 +191,6 @@ describe("PodyPassport", function () {
       
       const podyPassportAddress = await podyPassport.getAddress();
       const mockERC20Address = await mockERC20.getAddress();
-      const ownerAddress = await owner.getAddress();
       const otherAccountAddress = await otherAccount.getAddress();
 
       // Mint some tokens to the PodyPassport contract
