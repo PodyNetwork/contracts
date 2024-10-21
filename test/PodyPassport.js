@@ -25,7 +25,7 @@ describe("PodyPassport", function () {
     it("Should set the correct hash rates and prices", async function () {
       const { podyPassport } = await loadFixture(deployPodyPassportFixture);
       expect(await podyPassport.hashRates(1)).to.equal(ethers.parseEther("1"));
-      expect(await podyPassport.hashRates(2)).to.equal(ethers.parseEther("1"));
+      expect(await podyPassport.hashRates(2)).to.equal(ethers.parseEther("1.5"));
       expect(await podyPassport.hashRates(3)).to.equal(ethers.parseEther("2"));
       expect(await podyPassport.hashRates(4)).to.equal(ethers.parseEther("2.5"));
       expect(await podyPassport.hashRates(5)).to.equal(ethers.parseEther("3"));

@@ -43,7 +43,7 @@ contract PodyPassport is ERC1155, Ownable2Step {
         multiSigWallet = _multiSigWallet;
 
         hashRates[BRONZE] = 1 ether;
-        hashRates[SILVER] = 1 ether;
+        hashRates[SILVER] = 3 ether / 2;
         hashRates[GOLD] = 2 ether;
         hashRates[PLATINUM] = 5 ether / 2;
         hashRates[DIAMOND] = 3 ether;
