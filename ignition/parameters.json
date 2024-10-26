@@ -1,5 +1,13 @@
 {
   "PodyPassportModule": {
     "multiSigWallet": "0x4778f5a7f8e7cec8b11f193f1dbe21d060ee95fb"
+  },
+  "PodyTokenModule": {
+    "supply": "100000000000000000000000000000"
+  },
+  "PodyGiftModule": {
+    "tokenAddress": "0x5F8d76F5016FCE269147CafA765D31411859fF89",
+    "initialFee": "1000",
+    "initialMinGiftAmount": "10"
   }
 }

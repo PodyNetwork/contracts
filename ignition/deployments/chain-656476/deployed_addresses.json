@@ -1,3 +1,5 @@
 {
-  "PodyPassportModule#PodyPassport": "0xBCD27acF4BE592e783B85E4d4c557f7DB495A95c"
+  "PodyPassportModule#PodyPassport": "0xBCD27acF4BE592e783B85E4d4c557f7DB495A95c",
+  "PodyTokenModule#PodyToken": "0x5F8d76F5016FCE269147CafA765D31411859fF89",
+  "PodyGiftModule#PodyGift": "0xd7049eC5EFf48fD515a06e2E17322FD070A34B14"
 }
