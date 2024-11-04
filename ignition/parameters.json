@@ -8,6 +8,9 @@
   "PodyGiftModule": {
     "tokenAddress": "0x5F8d76F5016FCE269147CafA765D31411859fF89",
     "initialFee": "1000",
-    "initialMinGiftAmount": "10"
+    "initialMinGiftAmount": "1000000000000000",
+    "initialMaxGiftAmount": "100000000000000000000000",
+    "initialMinEtherAmount": "100000000000000",
+    "initialMaxEtherAmount": "100000000000000000000000"
   }
 }
