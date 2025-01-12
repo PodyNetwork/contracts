@@ -46,7 +46,7 @@ describe("PodyPassport", function () {
   describe("Minting", function () {
     it("Should mint an NFT and update user data", async function () {
       const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.01") });
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x");
       const user = await podyPassport.users(otherAccount.address);
       expect(user.hashRate).to.equal(ethers.parseEther("1"));
       expect(user.level).to.equal(1);
@@ -60,7 +60,7 @@ describe("PodyPassport", function () {
       
       // Now try to mint a Silver NFT with insufficient funds
       await expect(podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.005") }))
-        .to.be.revertedWith("Insufficient funds sent");
+        .to.be.revertedWith("Incorrect amount");
     });
 
     it("Should upgrade the NFT if user already has one", async function () {
@@ -110,7 +110,7 @@ describe("PodyPassport", function () {
       const { podyPassport, owner, otherAccount, points } = await loadFixture(deployPodyPassportFixture);
       const nonce = ethers.hexlify(ethers.randomBytes(32));
 
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x");
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
@@ -135,7 +135,7 @@ describe("PodyPassport", function () {
       const { podyPassport, owner, otherAccount, points } = await loadFixture(deployPodyPassportFixture);
       const nonce = ethers.hexlify(ethers.randomBytes(32));
 
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x");
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
@@ -165,7 +165,7 @@ describe("PodyPassport", function () {
       const nonce = ethers.hexlify(ethers.randomBytes(32));
       const secondsOnCall = 3600;
 
-      await podyPassport.connect(owner).mint(otherAccount.address, "0x", { value: ethers.parseEther("0.001") });
+      await podyPassport.connect(owner).mint(otherAccount.address, "0x");
 
       const messageHash = await podyPassport.generatePoints(
         otherAccount.address,
@@ -295,7 +295,7 @@ describe("PodyPassport", function () {
     it("Should not allow safeTransferFrom", async function () {
       const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
       
-      await podyPassport.connect(owner).mint(owner.address, "0x", { value: ethers.parseEther("0.001") });
+      await podyPassport.connect(owner).mint(owner.address, "0x");
       
       await expect(
         podyPassport.connect(owner).safeTransferFrom(owner.address, otherAccount.address, 1, 1, "0x")
@@ -305,7 +305,7 @@ describe("PodyPassport", function () {
     it("Should not allow safeBatchTransferFrom", async function () {
       const { podyPassport, owner, otherAccount } = await loadFixture(deployPodyPassportFixture);
       
-      await podyPassport.connect(owner).mint(owner.address, "0x", { value: ethers.parseEther("0.001") });
+      await podyPassport.connect(owner).mint(owner.address, "0x");
       
       await expect(
         podyPassport.connect(owner).safeBatchTransferFrom(owner.address, otherAccount.address, [1], [1], "0x")

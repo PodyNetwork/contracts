@@ -77,23 +77,4 @@ describe("PodyGift", function () {
       expect(await giftContract.maxGiftAmountForToken(await podyToken.getAddress())).to.equal(newAdminMaxGiftAmount);
     });
   });
-
-  describe("Update Token Address", function () {
-    it("Should not allow non-owner to update token address", async function () {
-      const { giftContract, otherAccount } = await loadFixture(deployPodyGiftFixture);
-
-      const NewPodyToken = await ethers.getContractFactory("PodyToken");
-      const newPodyToken = await NewPodyToken.deploy(ethers.parseEther('1000000'));
-
-      await expect(giftContract.connect(otherAccount).updateToken(await newPodyToken.getAddress()))
-        .to.be.reverted;
-    });
-
-    it("Should not allow updating token address to zero address", async function () {
-      const { giftContract } = await loadFixture(deployPodyGiftFixture);
-
-      await expect(giftContract.updateToken("0x0000000000000000000000000000000000000000"))
-        .to.be.revertedWith("Token address cannot be zero");
-    });
-  });
 });

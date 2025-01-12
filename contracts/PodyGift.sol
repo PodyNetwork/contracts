@@ -93,10 +93,12 @@ contract PodyGift is Ownable2Step {
         uint256 commission = (msg.value * commissionFee) / 10000;
         uint256 amountAfterCommission = msg.value - commission;
 
-        recipient.transfer(amountAfterCommission);
-        payable(owner()).transfer(commission);
+        (bool success, ) = recipient.call{value: amountAfterCommission}("");
+        require(success, "Failed to send Ether to recipient");
+        (success, ) = payable(owner()).call{value: commission}("");
+        require(success, "Failed to send Ether to owner");
 
-        emit GiftSent(msg.sender, recipient, address(0), amountAfterCommission, commission);
+        emit GiftSent(msg.sender, recipient, 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, amountAfterCommission, commission);
     }
 
     /**
@@ -135,18 +137,6 @@ contract PodyGift is Ownable2Step {
     }
 
     /**
-     * @dev Updates the token address used for gifts.
-     * @param newTokenAddress The new token address.
-     */
-    function updateToken(address newTokenAddress) external onlyOwner {
-        require(newTokenAddress != address(0), "Token address cannot be zero");
-        token = PodyToken(newTokenAddress);
-        whitelistedTokens[newTokenAddress] = true;
-        emit TokenUpdated(newTokenAddress);
-        emit TokenWhitelisted(newTokenAddress, true);
-    }
-
-    /**
      * @dev Sets a token address as whitelisted or not.
      * @param tokenAddress The address of the token.
      * @param isWhitelisted Boolean indicating if the token is whitelisted.
@@ -157,6 +147,4 @@ contract PodyGift is Ownable2Step {
         emit TokenWhitelisted(tokenAddress, isWhitelisted);
     }
 
-    receive() external payable {}
-    fallback() external payable {}
 }

@@ -7,11 +7,13 @@ import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract PodyPassport is ERC1155, Ownable2Step {
     using MessageHashUtils for bytes32;
     using ECDSA for bytes32;
     using Math for uint256;
+    using SafeERC20 for IERC20;
 
     /// @dev Represents a user in the system with their hash rate, points, and level.
     struct User {
@@ -37,7 +39,6 @@ contract PodyPassport is ERC1155, Ownable2Step {
     event PointsClaimed(address indexed user, uint256 points); // Event emitted when points are claimed
     event FundsWithdrawn(address indexed token, address indexed to, uint256 amount); // Event emitted when funds are withdrawn
 
-    error ClaimPointsOperationFailed(address signer, address owner); // Error for failed claim points operation
 
     /// @dev Constructor to initialize the contract with a multisig wallet address.
     /// @param _multiSigWallet The address of the multisig wallet.
@@ -65,8 +66,11 @@ contract PodyPassport is ERC1155, Ownable2Step {
         User storage user = users[account];
         require(user.level < 5, "You have reached the maximum level");
         uint256 nextLevel = user.level + 1;
+        if (user.level == 0 && msg.value > 0) {
+            revert("No funds required for level 0");
+        }
         if (user.level != 0) {
-            require(msg.value == prices[nextLevel], "Insufficient funds sent");
+            require(msg.value == prices[nextLevel], "Incorrect amount");
             (bool success, ) = multiSigWallet.call{value: msg.value}("");
             require(success, "Failed to send funds to multisig wallet");
             emit FundsWithdrawn(address(0), multiSigWallet, msg.value);
@@ -150,8 +154,39 @@ contract PodyPassport is ERC1155, Ownable2Step {
         require(amount > 0, "Amount must be greater than zero");
         uint256 balance = token.balanceOf(address(this));
         require(balance >= amount, "Insufficient token balance");
-        bool success = token.transfer(to, amount);
-        require(success, "Token transfer failed");
+        token.safeTransfer(to, amount);
         emit FundsWithdrawn(address(token), to, amount);
+    }
+
+    /// @dev Returns the URI for a token ID.
+    /// @param id The ID of the token.
+    /// @return The URI for the token.
+    function uri(uint256 id) public pure override returns (string memory) {
+        return string(abi.encodePacked("https://api.pody.network/nft/pody-points/metadata/", uint2str(id), ".json"));
+    }
+
+    /// @dev Converts a uint to its string representation.
+    /// @param _i The uint to convert.
+    /// @return _uintAsString The string representation of the uint.
+    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint j = _i;
+        uint len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint k = len;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
     }
 }
