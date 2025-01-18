@@ -1,16 +1,17 @@
 {
   "PodyPassportModule": {
-    "multiSigWallet": "0x4778f5a7f8e7cec8b11f193f1dbe21d060ee95fb"
+    "multiSigWallet": "0xdb63793e9590139731EAFA99450a2b3221c06f42"
   },
   "PodyTokenModule": {
-    "supply": "100000000000000000000000000000"
+    "supply": "1000000000000000000000000000",
+    "multiSigWallet": "0xdb63793e9590139731EAFA99450a2b3221c06f42"
   },
   "PodyGiftModule": {
-    "tokenAddress": "0x5F8d76F5016FCE269147CafA765D31411859fF89",
+    "tokenAddress": "0xdED648DB4Ef3a2C84C926A0082Fd285259FBc9f1",
     "initialFee": "1000",
-    "initialMinGiftAmount": "1000000000000000",
+    "initialMinGiftAmount": "10000000000000",
     "initialMaxGiftAmount": "100000000000000000000000",
-    "initialMinEtherAmount": "100000000000000",
+    "initialMinEtherAmount": "1000000000000",
     "initialMaxEtherAmount": "100000000000000000000000"
   }
 }

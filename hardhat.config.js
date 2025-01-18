@@ -16,8 +16,14 @@ module.exports = {
     },
   },
   networks: {
-    opencampus: {
+    "open-campus-codex": {
       url: `https://open-campus-codex-sepolia.drpc.org`,
+      accounts: {
+        mnemonic: process.env.PASSPHRASE ?? "",
+      },
+    },
+    "educhain": {
+      url: "https://rpc.edu-chain.raas.gelato.cloud",
       accounts: {
         mnemonic: process.env.PASSPHRASE ?? "",
       },
