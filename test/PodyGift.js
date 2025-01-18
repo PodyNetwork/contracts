@@ -1,14 +1,13 @@
 const { loadFixture } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { constants } = require("ethers");
 
 describe("PodyGift", function () {
   async function deployPodyGiftFixture() {
     const [owner, recipient, otherAccount] = await ethers.getSigners();
 
     const PodyToken = await ethers.getContractFactory("PodyToken");
-    const podyToken = await PodyToken.deploy(ethers.parseEther('1000000'));
+    const podyToken = await PodyToken.deploy(await owner.getAddress(), ethers.parseEther('1000000'));
 
     const initialFee = 500;
     const initialMinGiftAmount = ethers.parseEther("0.1");
